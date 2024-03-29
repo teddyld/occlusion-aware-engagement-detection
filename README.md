@@ -7,9 +7,12 @@ In hour-long seminars, lectures or tutorials covering often complex topics, many
 <summary>Setup</summary>
 This project runs on Python 3.10.11
 Pip install all requirements
+
 ```
 pip install -r requirements.txt
 ```
+</details>
+
 ## <div align="center">Contact Me</div>
 Email: z5363266@ad.unsw.edu.au
 Linkedin: https://www.linkedin.com/in/vincentpham2/
