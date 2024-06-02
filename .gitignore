@@ -160,6 +160,6 @@ cython_debug/
 #.idea/
 
 /data
-src/runs
-src/yolov8n-cls.pt
-src/yolov8n.pt
+src/YOLO/runs
+src/YOLO/yolov8n-cls.pt
+src/YOLO/yolov8n.pt
