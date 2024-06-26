@@ -115,7 +115,7 @@ def parse_data(data_split):
 
 def get_datasets(augment_tf=None):
     '''
-    Return train, validation, and test datasets with optional augment_tf to apply to train dataset
+    Return train, validation, and test datasets with optional 'augment_tf' to apply to train dataset
     '''
     train_dataset = FER2013('train', augment_tf)
     base_tf = A.Compose([
@@ -126,6 +126,9 @@ def get_datasets(augment_tf=None):
     return train_dataset, valid_dataset, test_dataset
 
 def get_dataloaders(augment_tf=None, bs=64):
+    '''
+    Return train, valid, and test DataLoaders with 'augment_tf' transform to apply to training set and batch size 'bs'
+    '''
     train, valid, test = get_datasets(augment_tf)
     train_loader = DataLoader(train, batch_size=bs, shuffle=True)
     valid_loader = DataLoader(valid, batch_size=bs, shuffle=False)
@@ -133,6 +136,9 @@ def get_dataloaders(augment_tf=None, bs=64):
     return train_loader, valid_loader, test_loader
 
 def get_class_weights(DEVICE=None):
+    '''
+    Return class weights of train dataset
+    '''
     if not DEVICE:
         DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
