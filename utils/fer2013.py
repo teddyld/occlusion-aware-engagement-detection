@@ -9,6 +9,8 @@ from sklearn.utils.class_weight import compute_class_weight
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from utils.plot import plot_class_distribution
+import utils.detect as detect
+from tqdm import tqdm
 
 class FER2013(Dataset):
     def __init__(self, ttv, transform=None):
@@ -62,6 +64,54 @@ def load_data_split(path=config.CSV_PATH):
         'val': fer2013[fer2013[' Usage'] == 'PublicTest'],
         'test': fer2013[fer2013[' Usage'] == 'PrivateTest']
     }
+
+def parse_data(data_split):
+    '''
+    Write data in Dataframe to disk, optionally apply preprocessing to image
+    Arguments:
+        data_split (dictionary) - dictionary containing key-value pairs of dataset split (string) and Dataframe of split
+    '''
+    
+    for ttv, data in data_split.items():
+        images = data[' pixels'].tolist()
+        labels = data['emotion'].tolist()
+        out_labels = []
+        out_landmarks = []
+
+        # Write images to disk
+        image_idx = 0
+        loop = tqdm(enumerate(images), total=len(images), leave=True)
+        for idx, image in loop:
+            loop.set_description(f'Writing {ttv} dataset to disk')
+            
+            # Write image to disk
+            image_path = os.path.join(config.DATA_PATH, ttv, str(ttv) + '_' + str(image_idx) + '.jpg')
+            cv2.imwrite(image_path, image)
+            out_labels.append(labels[idx])
+            image_idx += 1
+
+            # Pre-processing face detection step
+            face_features = detect.detect_face_features(image_path)
+            
+            if face_features:
+                bbox, landmarks = face_features
+                image = cv2.imread(image_path)
+                # Crop to image bbox region
+                image = image[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+                # Resize image to 48x48 resolution
+                image = cv2.resize(image, dsize=(48, 48), interpolation=cv2.INTER_CUBIC)
+                # Overwrite image
+                cv2.imwrite(image_path, image)
+                # Append to landmarks annotations
+                out_landmarks.append(landmarks)
+            else:
+                out_landmarks.append(None)
+
+        # Write labels to disk
+        np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'labels.npy'), out_labels)
+        
+        # Write landmarks to disk
+        np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'landmarks.npy'), out_labels)
 
 def get_datasets(augment_tf=None):
     '''
