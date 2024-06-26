@@ -159,7 +159,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-/data
-src/YOLO/runs
-src/YOLO/yolov8n-cls.pt
-src/YOLO/yolov8n.pt
+/data/DAiSEE
+/data/FER-2013/
