@@ -104,7 +104,7 @@ def parse_data(data_split):
                 # Append to landmarks annotations
                 out_landmarks.append(landmarks)
             else:
-                out_landmarks.append([[-1, -1] for _ in range(5)])
+                out_landmarks.append([[0, 0] for _ in range(5)])
 
         # Write labels to disk
         np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'labels.npy'), out_labels)
