@@ -6,7 +6,8 @@ from sklearn.metrics import confusion_matrix, classification_report
 import torch
 import cv2
 import utils.detect as detect
-
+import utils.config as config
+import os
 
 FER_CLASS_MAP = {
     0: 'angry',
@@ -57,33 +58,28 @@ def plot_preprocess_step(data_split, which_ttv, process_function):
     plt.tight_layout()
     plt.show()
 
-def plot_augmentation(loader, which_ttv, transform):
+def plot_augmentation(transform, dir=config.TRAIN_PATH):
     '''
-    Plot a random image from the loader and apply 'transform' to four instances of the image, plotting the resulting augmentations
+    Apply 'transform' four times to a random image in dir, plotting the resulting augmentations
     Arguments:
-        loader (DataLoader) - DataLoader of image dataset
-        which_ttv (string) - prepend 'train', 'val' or 'test' to image index
         transform (callable) - an albumentations transform
+        dir (string) - path to image directory
     '''
-    if which_ttv not in ['train', 'val', 'test']:
-        print(f'{which_ttv} is not a valid argument')
-        return
-
-    dataiter = iter(loader)
-    images, labels = next(dataiter)
- 
-    random_image_idx = random.randint(0, len(images) - 1)
-
+    
+    dir_list = os.listdir(dir)
+    random_image_idx = random.randint(0, len(dir_list) - 1)
+    image_path = dir + '/' + dir_list[random_image_idx] 
+    
     fig, axes = plt.subplots(1, 5, figsize=(10, 4), subplot_kw={'xticks': [], 'yticks': []})
-    fig.suptitle(f'Image: {which_ttv}_{random_image_idx}.jpg \nClass: {FER_CLASS_MAP[labels[random_image_idx].item()]}', y=0.9)
+    fig.suptitle(f'Image: {dir_list[random_image_idx]}', y=0.9)
     
     # Plot original image
-    original_image = images[random_image_idx].permute(1, 2, 0).numpy()
+    original_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     
     axes[0].imshow(original_image, cmap="gray")
     axes[0].set_title('Original Image')
 
-    # Plot augmented image + data pre-processing
+    # Plot augmented image
     for i, ax in enumerate(axes[1:].flat):
         augmented_image = transform(image=original_image)['image'].permute(1, 2, 0).numpy()
         ax.imshow(augmented_image, cmap="gray")
@@ -98,7 +94,7 @@ def plot_fer_dataset(loader):
     Arguments:
         loader (iterable) - a DataLoader class from PyTorch which loads the FER2013 Dataset
     '''
-    fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(10, 5), subplot_kw={'xticks': [], 'yticks': []})
+    _, axes = plt.subplots(nrows=2, ncols=4, figsize=(10, 5), subplot_kw={'xticks': [], 'yticks': []})
 
     for images, labels in loader:
         for i, ax in enumerate(axes.flat):
@@ -179,7 +175,7 @@ def plot_predictions(model, loader, device):
     '''
     model.to(device)
     model.eval()
-    fig, axes = plt.subplots(nrows=2, ncols=4, figsize=(10, 5), subplot_kw={'xticks': [], 'yticks': []})
+    _, axes = plt.subplots(nrows=2, ncols=4, figsize=(10, 5), subplot_kw={'xticks': [], 'yticks': []})
 
     # Make prediction on test set
     with torch.no_grad():
@@ -206,14 +202,17 @@ def plot_image_features(image_path, bbox, landmarks):
     '''
     Plot face bbox (red) and landmarks (green) on image_path in grayscale
     '''
+    landmark_labels = ['left_eye', 'right_eye', 'nose', 'left_mouth', 'right_mouth']
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     _, ax = plt.subplots()
-    ax.imshow(image, cmap='gray')
     
-    for x, y in landmarks:
+    for i, point in enumerate(landmarks):
+        x, y = point
         circle = patches.Circle((x, y), radius=1, color='lime')
         ax.add_patch(circle)
-    
+        cv2.putText(image, landmark_labels[i], (x, y-10), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.6, color=(255), thickness=2)
+        
+    ax.imshow(image, cmap='gray')
     rect = detect.bbox_to_rect(bbox)
     ax.add_patch(rect)
     

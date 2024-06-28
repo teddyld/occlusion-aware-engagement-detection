@@ -6,8 +6,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.utils.class_weight import compute_class_weight
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+import utils.transforms as transforms
 from utils.plot import plot_class_distribution
 import utils.detect as detect
 from tqdm import tqdm
@@ -105,24 +104,21 @@ def parse_data(data_split):
                 # Append to landmarks annotations
                 out_landmarks.append(landmarks)
             else:
-                out_landmarks.append(None)
+                out_landmarks.append([[-1, -1] for _ in range(5)])
 
         # Write labels to disk
         np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'labels.npy'), out_labels)
         
         # Write landmarks to disk
-        np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'landmarks.npy'), out_labels)
+        np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'landmarks.npy'), out_landmarks)
 
 def get_datasets(augment_tf=None):
     '''
     Return train, validation, and test datasets with optional 'augment_tf' to apply to train dataset
     '''
     train_dataset = FER2013('train', augment_tf)
-    base_tf = A.Compose([
-        ToTensorV2(),
-    ])
-    valid_dataset = FER2013('val', base_tf)
-    test_dataset = FER2013('test', base_tf)
+    valid_dataset = FER2013('val', transforms.simple_tf)
+    test_dataset = FER2013('test', transforms.simple_tf)
     return train_dataset, valid_dataset, test_dataset
 
 def get_dataloaders(augment_tf=None, bs=64):
