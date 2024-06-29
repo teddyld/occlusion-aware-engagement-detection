@@ -1,10 +1,11 @@
 import torch.nn as nn
-import timm
+import torchvision.models as models
 
 class ResNet50(nn.Module):
-    def __init__(self, pretrained=True):
+    def __init__(self):
         super().__init__()
-        self.model = timm.create_model('resnet50.a1_in1k', pretrained=pretrained)
+        weights = models.ResNet50_Weights.DEFAULT
+        self.model = models.resnet50(weights=weights)
         n_features = self.model.fc.in_features
         self.model.fc = nn.Linear(n_features, 7)
 
