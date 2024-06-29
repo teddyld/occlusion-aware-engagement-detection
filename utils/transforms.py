@@ -1,42 +1,15 @@
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from albumentations.core.transforms_interface import ImageOnlyTransform
 import cv2
-from utils.config import ALOT_DATA_PATH
-
-# Simulate facial accessories and external occlusions by applying random dropout to face landmarks i.e. across the eyes, nose, and mouth
-class RandomLandmarksDropout(ImageOnlyTransform):
-    def __init__(self, always_apply=False, p=0.5):
-        super().__init__(always_apply, p)
-        
-    def apply(self, img, **params):
-        # TODO
-        return img
-
-# Simulate self-occlusion by cropping a random edge of the image
-class RandomCropEdges(ImageOnlyTransform):
-    def __init__(self, always_apply=False, p=0.5):
-        super().__init__(always_apply, p)
-        
-    def apply(self, img, **params):
-        # TODO
-        return img
-
-# Simulate artificial occlusion by randomly erasing the image with a random ALOT texture
-class RandomALOTDropout(ImageOnlyTransform):
-    def __init__(self, always_apply=False, p=0.5):
-        super().__init__(always_apply, p)
-        self.data = ALOT_DATA_PATH
-        
-    def apply(self, img, **params):
-        # TODO
-        return img
+from utils.dropouts.alot_dropout import ALOTDropout
+from utils.dropouts.landmarks_dropout import LandmarksDropout
+from utils.dropouts.edge_dropout import EdgeDropout
 
 # Test and valid dataset transform
 simple_tf = A.Compose([
     A.Normalize(mean=(0.485, ), std=(0.229, )),
     ToTensorV2(),
-])
+], keypoint_params=A.KeypointParams(format='xy'))
 
 # Non-occlusion-aware training dataset transform
 baseline_tf = A.Compose([
@@ -46,7 +19,7 @@ baseline_tf = A.Compose([
     A.Rotate(limit=10, border_mode=cv2.BORDER_REPLICATE),
     A.Normalize(mean=(0.485, ), std=(0.229, )),
     ToTensorV2(),
-])
+], keypoint_params=A.KeypointParams(format='xy'))
 
 # Occlusion-aware training dataset transform
 occlusion_aware_tf = A.Compose([
@@ -54,9 +27,9 @@ occlusion_aware_tf = A.Compose([
     
     # Simulate limited field of view and self-occlusion
     A.Rotate(limit=10, border_mode=cv2.BORDER_REPLICATE, p=0.5),
-
     # Simulate artificial occlusion
     A.OneOf([
+        ALOTDropout(num_holes_range=(1, 1), hole_height_range=(16, 16), hole_width_range=(16, 16)),
         A.GaussNoise(),
         A.GaussianBlur(blur_limit=(3, 7), sigma_limit=0),
         A.CoarseDropout(num_holes_range=(10, 20), hole_height_range=(3, 3), hole_width_range=(3, 3)),
@@ -70,7 +43,7 @@ occlusion_aware_tf = A.Compose([
 ], keypoint_params=A.KeypointParams(format='xy'))
 
 test_tf = A.Compose([
-    RandomCropEdges(),
+    EdgeDropout(edge_height_range=(8, 16), edge_width_range=(8, 16), fill_value="random", p=1),
     A.Normalize(mean=(0.485, ), std=(0.229, )),
     ToTensorV2(),
 ], keypoint_params=A.KeypointParams(format='xy'))

@@ -22,7 +22,8 @@ class FER2013(Dataset):
             raise ValueError(f"ttv={ttv} is not 'train', 'val', 'test'") 
         self.data = os.path.join(config.DATA_PATH, ttv)
         self.labels = np.load(os.path.join(config.ANNOTATIONS_PATH, ttv + '_labels.npy'))
-        self.landmarks = np.load(os.path.join(config.ANNOTATIONS_PATH, ttv + '_landmarks.npy'))   
+        self.landmarks = np.load(os.path.join(config.ANNOTATIONS_PATH, ttv + '_landmarks.npy'))
+        self.landmark_labels = ['left_eye', 'right_eye', 'nose', 'left_mouth', 'right_mouth'] 
         self.transform = transform
         self.ttv = ttv
     def __len__(self):
@@ -36,6 +37,7 @@ class FER2013(Dataset):
         label = torch.tensor(self.labels[idx], dtype=torch.uint8)
         return image, label
     
+    # Debugging/Helper Methods
     def get_labels(self):
         return self.labels
     
