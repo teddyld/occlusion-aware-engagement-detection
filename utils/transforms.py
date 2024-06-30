@@ -2,6 +2,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import cv2
 from utils.dropouts.alot_dropout import ALOTDropout
+from utils.dropouts.landmarks_dropout import LandmarksDropout
 from utils.dropouts.edge_dropout import EdgeDropout
 
 # Simple transform
