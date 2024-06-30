@@ -10,22 +10,24 @@ import utils.transforms as transforms
 from utils.plot import plot_class_distribution
 import utils.detect as detect
 from tqdm import tqdm
+import albumentations as A
 
 class FER2013(Dataset):
-    def __init__(self, ttv, transform=None):
+    def __init__(self, ttv, transform=None, apply_landmark_tf=False):
         '''
         Arguments:
             ttv (string): 'train', 'val', or 'test'
             transform (callable, optional): Optional transform to be applied on image
+            apply_landmark_tf (boolean, optional): Optional boolean that if asserted True will apply the LandmarksDropout transform to the image
         '''
         if ttv not in ['train', 'val', 'test']:
             raise ValueError(f"ttv={ttv} is not 'train', 'val', 'test'") 
         self.data = os.path.join(config.DATA_PATH, ttv)
         self.labels = np.load(os.path.join(config.ANNOTATIONS_PATH, ttv + '_labels.npy'))
         self.landmarks = np.load(os.path.join(config.ANNOTATIONS_PATH, ttv + '_landmarks.npy'))
-        self.landmark_labels = ['left_eye', 'right_eye', 'nose', 'left_mouth', 'right_mouth'] 
         self.transform = transform
         self.ttv = ttv
+        self.apply_landmark_tf = apply_landmark_tf
     def __len__(self):
         return len(self.labels)
     
@@ -33,7 +35,15 @@ class FER2013(Dataset):
         image_name = self.ttv + '_' + str(idx) + '.jpg'
         image = cv2.imread(os.path.join(self.data, image_name), cv2.IMREAD_GRAYSCALE)
         if self.transform:
+            if self.apply_landmark_tf:
+                # Simulate facial accessories and external occlusions
+                keypoints = self.landmarks[idx]
+                landmark_tf = A.Compose([
+                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), fill_value=0)
+                ])
+                image = landmark_tf(image=image)['image']
             image = self.transform(image=image)['image']
+    
         label = torch.tensor(self.labels[idx], dtype=torch.uint8)
         return image, label
     
@@ -114,20 +124,20 @@ def parse_data(data_split):
         # Write landmarks to disk
         np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'landmarks.npy'), out_landmarks)
 
-def get_datasets(augment_tf=None):
+def get_datasets(augment_tf=None, apply_landmark_tf=False):
     '''
-    Return train, validation, and test datasets with optional 'augment_tf' to apply to train dataset
+    Return train, validation, and test datasets with optional 'augment_tf' transform to apply to train dataset
     '''
-    train_dataset = FER2013('train', augment_tf)
+    train_dataset = FER2013('train', augment_tf, apply_landmark_tf)
     valid_dataset = FER2013('val', transforms.simple_tf)
     test_dataset = FER2013('test', transforms.simple_tf)
     return train_dataset, valid_dataset, test_dataset
 
-def get_dataloaders(augment_tf=None, bs=64):
+def get_dataloaders(augment_tf=None, bs=64, apply_landmark_tf=False):
     '''
-    Return train, valid, and test DataLoaders with 'augment_tf' transform to apply to training set and batch size 'bs'
+    Return train, valid, and test DataLoaders with 'augment_tf' transform to apply to training set and batch size 'bs'. If apply_landmark_tf is True, then the image will also be augmented with LandmarksDropout
     '''
-    train, valid, test = get_datasets(augment_tf)
+    train, valid, test = get_datasets(augment_tf, apply_landmark_tf)
     train_loader = DataLoader(train, batch_size=bs, shuffle=True)
     valid_loader = DataLoader(valid, batch_size=bs, shuffle=False)
     test_loader = DataLoader(test, batch_size=bs, shuffle=True)
