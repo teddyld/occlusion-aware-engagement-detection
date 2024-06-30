@@ -33,13 +33,14 @@ def edge_dropout(img, edge_height, edge_width, edge_name, fill_value):
         raise ValueError(f"Edge name must be top, bottom, left, or right. Got:{edge_name}")
     return img
 
-def landmarks_dropout(img, landmarks, feature, fill_value):
+def landmarks_dropout(img, landmarks, feature, dropout_height, fill_value):
     """Dropout a facial feature of an image using the image landmarks and fill it with fill_value. For example, if the feature is 'eyes' it will dropout the eyes with a rectangular region.  
     
     Args:
         img (np.ndarray): The image to augment
         landmarks (List[List[int, int], ...]): Specifies the list of keypoints in order of the 'left_eye', 'right_eye', 'nose', 'left_mouth' and 'right_mouth' labels in the xy format.
         feature (string): Specifies the facial feature to dropout. One of 'eyes', 'nose' or 'mouth'
+        dropout_height (int): The height of the dropout region
         fill_value (ColorType, Literal["random"]): The fill value to use for the dropout. Can be a single integer or the string "random" to fill with random noise
     """
     img = img.copy()
