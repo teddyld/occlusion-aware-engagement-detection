@@ -47,7 +47,8 @@ def landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, fi
     """
     img = img.copy()
     height, width = img.shape[:2]
-    G = nx.grid_2d_graph(width, height)
+    # Create one-indexed 2d graph
+    G = nx.grid_2d_graph(width + 1, height + 1)
     if feature in ('eyes', 'mouth'):
         left_key, right_key = tuple(landmarks[0]), tuple(landmarks[1])
         # Generate shortest path of points between landmarks
@@ -71,6 +72,7 @@ def generate_fill(dropout_shape, fill_value, dtype):
     return fill_value
 
 def dropout_along_path(img, dropout_height, dropout_width, path, fill_value):
+    """Generate a fill based on the path between keypoints. Each keypoint in path is a node that will be dropped along with its neighbouring pixels specified by dropout_height and dropout_width"""
     for node in path:
         x, y = node[0], node[1]
         dropout_shape = (2 * dropout_height, 2 * dropout_width)
