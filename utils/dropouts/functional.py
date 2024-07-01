@@ -3,6 +3,7 @@ import random
 import cv2
 from . import utils
 import numpy as np
+import networkx as nx
 
 def edge_dropout(img, edge_height, edge_width, edge_name, fill_value):
     """Dropout the edge of an image and fill it with fill_value
@@ -33,17 +34,29 @@ def edge_dropout(img, edge_height, edge_width, edge_name, fill_value):
         raise ValueError(f"Edge name must be top, bottom, left, or right. Got:{edge_name}")
     return img
 
-def landmarks_dropout(img, landmarks, feature, dropout_height, fill_value):
+def landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, fill_value):
     """Dropout a facial feature of an image using the image landmarks and fill it with fill_value. For example, if the feature is 'eyes' it will dropout the eyes with a rectangular region.  
     
     Args:
         img (np.ndarray): The image to augment
-        landmarks (List[List[int, int], ...]): Specifies the list of keypoints in order of the 'left_eye', 'right_eye', 'nose', 'left_mouth' and 'right_mouth' labels in the xy format.
+        landmarks (List[List[int, int], List[int, int]], List[List[int, int]]): Specifies the list of keypoints in the xy format. Contains only one keypoint in the case that the feature is 'nose' and two elements otherwise
         feature (string): Specifies the facial feature to dropout. One of 'eyes', 'nose' or 'mouth'
         dropout_height (int): The height of the dropout region
+        dropout_width (int): The width of the dropout region.
         fill_value (ColorType, Literal["random"]): The fill value to use for the dropout. Can be a single integer or the string "random" to fill with random noise
     """
     img = img.copy()
+    height, width = img.shape[:2]
+    G = nx.grid_2d_graph(width, height)
+    if feature in ('eyes', 'mouth'):
+        left_key, right_key = tuple(landmarks[0]), tuple(landmarks[1])
+        # Generate shortest path of points between landmarks
+        path = nx.bidirectional_shortest_path(G, source=left_key, target=right_key)
+        img = dropout_along_path(img, dropout_height, dropout_width, path, fill_value)
+    elif feature == 'nose':
+        x, y = landmarks[0][0], landmarks[0][1]
+        dropout_shape = (dropout_height * 2, dropout_width * 2)
+        img[y - dropout_height:y + dropout_height, x - dropout_width:x + dropout_width] = generate_fill(dropout_shape, fill_value, img.dtype)
     return img
 
 def generate_fill(dropout_shape, fill_value, dtype):
@@ -56,6 +69,17 @@ def generate_fill(dropout_shape, fill_value, dtype):
         return random_fill
 
     return fill_value
+
+def dropout_along_path(img, dropout_height, dropout_width, path, fill_value):
+    for node in path:
+        x, y = node[0], node[1]
+        dropout_shape = (2 * dropout_height, 2 * dropout_width)
+        img[
+            y - dropout_height:y + dropout_height, 
+            x - dropout_width:x + dropout_width
+        ] = generate_fill(dropout_shape, fill_value, img.dtype)
+
+    return img
 
 def alot_dropout(img, data_path, holes):
     """Apply cutout augmentation by cutting out holes and filling them with random images from the ALOT dataset
