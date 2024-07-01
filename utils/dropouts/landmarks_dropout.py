@@ -108,7 +108,7 @@ class LandmarksDropout(ImageOnlyTransform):
             if left_key[1] - proposed_height < 0:
                 left_upper_limit = left_key[1]
             
-            if right_key[1] - proposed_width < 0:
+            if right_key[1] - proposed_height < 0:
                 right_upper_limit = right_key[1]      
 
             upper_limit = min(left_upper_limit, right_upper_limit)
@@ -117,7 +117,7 @@ class LandmarksDropout(ImageOnlyTransform):
             if left_key[1] + proposed_height > height:
                 left_lower_limit = height - left_key[1]
             
-            if right_key[1] + proposed_width > height:
+            if right_key[1] + proposed_height > height:
                 right_lower_limit = height - right_key[1]
                 
             lower_limit = min(left_lower_limit, right_lower_limit)
