@@ -5,9 +5,7 @@ import utils.config as config
 import cv2
 import torch
 from torch.utils.data import Dataset, DataLoader
-from sklearn.utils.class_weight import compute_class_weight
 import utils.transforms as transforms
-from utils.plot import plot_class_distribution
 import utils.detect as detect
 from tqdm import tqdm
 import albumentations as A
@@ -142,17 +140,3 @@ def get_dataloaders(augment_tf=None, bs=64, apply_landmark_tf=False):
     valid_loader = DataLoader(valid, batch_size=bs, shuffle=False)
     test_loader = DataLoader(test, batch_size=bs, shuffle=True)
     return train_loader, valid_loader, test_loader
-
-def get_class_weights(DEVICE=None):
-    '''
-    Return class weights of train dataset
-    '''
-    if not DEVICE:
-        DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    train_dataset, _, _ = get_datasets()
-    plot_class_distribution(train_dataset)
-    labels = train_dataset.get_labels()
-    class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(labels), y=labels)
-    return torch.tensor(class_weights).float().to(DEVICE)
-    
