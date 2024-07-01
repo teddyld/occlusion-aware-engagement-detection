@@ -50,7 +50,7 @@ class LandmarksDropout(ImageOnlyTransform):
         )
 
         for keypoint in self.landmarks:
-            if not any(keypoint):
+            if any(keypoint):
                 return functional.landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, self.fill_value)
         # All keypoints are [0, 0] meaning that the image had no detected face
         return img
