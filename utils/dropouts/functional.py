@@ -122,7 +122,7 @@ def get_random_alot_image(data_path, dtype, width, height):
         alot_dir = os.listdir(data_path)
 
         # Get random subdirectory path
-        random_alot_subdir_path = f"{data_path}/{random.randint(0, len(alot_dir) - 1)}"
+        random_alot_subdir_path = f"{data_path}/{random.randint(1, len(alot_dir) - 1)}"
         random_alot_subdir = os.listdir(random_alot_subdir_path)
 
         # Get random image path

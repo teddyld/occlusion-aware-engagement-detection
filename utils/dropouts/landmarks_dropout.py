@@ -49,11 +49,22 @@ class LandmarksDropout(ImageOnlyTransform):
             landmarks,
         )
 
+        zero_count = 0
         for keypoint in self.landmarks:
-            if any(keypoint):
-                return functional.landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, self.fill_value)
+            x, y = keypoint[0], keypoint[1]
+            # Sometimes CompreFace returns landmarks outside of the range of the image
+            if x < 0 or x > width or y < 0 or y > height:
+                return img
+            
+            if not any(keypoint):
+                zero_count += 1
+                
         # All keypoints are [0, 0] meaning that the image had no detected face
-        return img
+        if zero_count == len(landmarks):
+            return img
+        else:
+        # Face detected
+            return functional.landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, self.fill_value)
     
     def get_random_feature_landmarks(self):
         """Get the randomly selected feature and its landmarks by choosing from the normalized probability of landmarks_weight"""
