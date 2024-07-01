@@ -73,7 +73,7 @@ def plot_augmentation(transform, apply_landmark_tf=False):
     image, label = train_dataset[random_idx]
     
     fig, axes = plt.subplots(1, 5, figsize=(10, 4), subplot_kw={'xticks': [], 'yticks': []})
-    fig.suptitle(f'Image label: {label}', y=0.9)
+    fig.suptitle(f'Image label: {FER_CLASS_MAP[label.item()]}', y=0.9)
     
     # Plot original image
     axes[0].imshow(image, cmap="gray")
