@@ -6,8 +6,11 @@ from sklearn.metrics import confusion_matrix, classification_report
 import torch
 import cv2
 import utils.detect as detect
-import utils.config as config
-import os
+from utils.fer2013 import get_datasets
+import utils.transforms as transforms
+import albumentations as A
+from sklearn.utils.class_weight import compute_class_weight
+import numpy as np
 
 FER_CLASS_MAP = {
     0: 'angry',
@@ -58,31 +61,35 @@ def plot_preprocess_step(data_split, which_ttv, process_function):
     plt.tight_layout()
     plt.show()
 
-def plot_augmentation(transform, dir=config.TRAIN_PATH):
+def plot_augmentation(transform, apply_landmark_tf=False):
     '''
-    Apply 'transform' four times to a random image in dir, plotting the resulting augmentations
+    Apply 'transform' four times to a random image in the FER2013 train set, plotting the resulting augmentations
     Arguments:
         transform (callable) - an albumentations transform
-        dir (string) - path to image directory
+        apply_landmark_tf (optional, boolean) - assert True to apply LandmarksDropout to image
     '''
-    
-    dir_list = os.listdir(dir)
-    random_image_idx = random.randint(0, len(dir_list) - 1)
-    image_path = dir + '/' + dir_list[random_image_idx] 
+    train_dataset, _, _ = get_datasets()
+    random_idx = random.randint(0, len(train_dataset) - 1)
+    image, label = train_dataset[random_idx]
     
     fig, axes = plt.subplots(1, 5, figsize=(10, 4), subplot_kw={'xticks': [], 'yticks': []})
-    fig.suptitle(f'Image: {dir_list[random_image_idx]}', y=0.9)
+    fig.suptitle(f'Image label: {label}', y=0.9)
     
     # Plot original image
-    original_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    
-    axes[0].imshow(original_image, cmap="gray")
+    axes[0].imshow(image, cmap="gray")
     axes[0].set_title('Original Image')
 
     # Plot augmented image
     for i, ax in enumerate(axes[1:].flat):
-        augmented_image = transform(image=original_image)['image'].permute(1, 2, 0).numpy()
-        ax.imshow(augmented_image, cmap="gray")
+        img = image.copy()
+        if apply_landmark_tf:
+            keypoints = train_dataset.get_landmarks()[random_idx]
+            landmark_tf = A.Compose([
+                transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 4), dropout_width_range=(4, 4), fill_value="random")
+            ])
+            img = landmark_tf(image=img)['image']
+        img = transform(image=img)['image'].permute(1, 2, 0).numpy()
+        ax.imshow(img, cmap="gray")
         ax.set_title(f'Augmented Image {i + 1}')
     
     plt.tight_layout()
@@ -224,3 +231,17 @@ def display_classification_report(results):
     '''
     print('=== Classification Report ===')
     print(classification_report(results['y_true'], results['y_pred'], target_names=FER_CLASS_LABELS, digits=4))
+    
+def get_class_weights(DEVICE=None):
+    '''
+    Return class weights of train dataset
+    '''
+    if not DEVICE:
+        DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    train_dataset, _, _ = get_datasets()
+    plot_class_distribution(train_dataset)
+    labels = train_dataset.get_labels()
+    class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(labels), y=labels)
+    return torch.tensor(class_weights).float().to(DEVICE)
+    
