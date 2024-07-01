@@ -39,7 +39,7 @@ class FER2013(Dataset):
                 # Simulate facial accessories and external occlusions
                 keypoints = self.landmarks[idx]
                 landmark_tf = A.Compose([
-                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(8, 8), fill_value=0)
+                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 4), dropout_width_range=(4, 4), fill_value=0)
                 ])
                 image = landmark_tf(image=image)['image']
             image = self.transform(image=image)['image']
