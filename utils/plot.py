@@ -85,7 +85,7 @@ def plot_augmentation(transform, apply_landmark_tf=False):
         if apply_landmark_tf:
             keypoints = train_dataset.get_landmarks()[random_idx]
             landmark_tf = A.Compose([
-                transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 4), dropout_width_range=(4, 4), fill_value="random")
+                transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(2, 2), dropout_width_range=(2, 2), fill_value=0)
             ])
             img = landmark_tf(image=img)['image']
         img = transform(image=img)['image'].permute(1, 2, 0).numpy()
