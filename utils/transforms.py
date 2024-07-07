@@ -22,24 +22,36 @@ baseline_tf = A.Compose([
 ])
 
 # Occlusion-aware training dataset transform
-occlusion_aware_tf = A.Compose([    
-    # Simulate limited field of view and self-occlusion
+occlusion_aware_tf = A.Compose([
+    # Baseline transforms
+    A.RandomResizedCrop(size=(48, 48), scale=(0.8, 1.0), interpolation=cv2.INTER_LINEAR),
+    A.Affine(translate_percent=(-0.2, 0.2), interpolation=cv2.INTER_NEAREST, mode=cv2.BORDER_REPLICATE),
+    A.HorizontalFlip(),
     A.Rotate(limit=10, border_mode=cv2.BORDER_REPLICATE, p=0.5),
-    EdgeDropout(edge_height_range=(8, 24), edge_width_range=(8, 24), fill_value="random"),
-    # Simulate artificial occlusion
+    
+    # Occlusion+ transforms
     A.OneOf([
-        ALOTDropout(num_holes_range=(1, 1), hole_height_range=(16, 24), hole_width_range=(16, 24)),
+        # Simulate limited field of view and self-occlusion
+        A.GaussianBlur(blur_limit=(3, 5), sigma_limit=0),
+        
+        # Simulate artificial occlusion
         A.GaussNoise(),
-        A.GaussianBlur(blur_limit=(3, 7), sigma_limit=0),
-        A.CoarseDropout(num_holes_range=(10, 20), hole_height_range=(3, 3), hole_width_range=(3, 3)),
+    
+        # Simulate extreme illumination
+        A.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2), brightness_by_max=True, p=0.5),
     ], p=0.5),
-    # Simulate extreme illumination
-    A.RandomBrightnessContrast(brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2), brightness_by_max=True, p=0.5),
 
-    A.Resize(height=48, width=48, interpolation=cv2.INTER_LINEAR),
     A.Normalize(mean=(0.485, ), std=(0.229, )),
     ToTensorV2(),
 ])
+
+# MaskedAutoEncoder transform
+mae_tf = A.Compose([
+    A.RandomResizedCrop(size=(224, 224), scale=(0.8, 1.0), interpolation=cv2.INTER_LINEAR),
+    A.HorizontalFlip(),
+    ToTensorV2(),
+])
+ 
 
 def get_transform(tf_name):
     """Return the transform parsed by tf_name
@@ -53,5 +65,7 @@ def get_transform(tf_name):
         return baseline_tf
     elif tf_name == 'occlusion_aware':
         return occlusion_aware_tf
+    elif tf_name == 'mae':
+        return mae_tf
     else:
         return None

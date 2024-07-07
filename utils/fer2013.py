@@ -11,12 +11,12 @@ from tqdm import tqdm
 import albumentations as A
 
 class FER2013(Dataset):
-    def __init__(self, ttv, transform=None, apply_landmark_tf=False):
+    def __init__(self, ttv, transform=None, apply_dropout_tf=False):
         '''
         Arguments:
             ttv (string): 'train', 'val', or 'test'
             transform (callable, optional): Optional transform to be applied on image
-            apply_landmark_tf (boolean, optional): Optional boolean that if asserted True will apply the LandmarksDropout transform to the image
+            apply_dropout_tf (boolean, optional): Optional boolean that if asserted True will apply the *Dropout transforms to the image
         '''
         if ttv not in ['train', 'val', 'test']:
             raise ValueError(f"ttv={ttv} is not 'train', 'val', 'test'") 
@@ -25,7 +25,7 @@ class FER2013(Dataset):
         self.landmarks = np.load(os.path.join(config.ANNOTATIONS_PATH, ttv + '_landmarks.npy'))
         self.transform = transform
         self.ttv = ttv
-        self.apply_landmark_tf = apply_landmark_tf
+        self.apply_dropout_tf = apply_dropout_tf
     def __len__(self):
         return len(self.labels)
     
@@ -33,13 +33,17 @@ class FER2013(Dataset):
         image_name = self.ttv + '_' + str(idx) + '.jpg'
         image = cv2.imread(os.path.join(self.data, image_name), cv2.IMREAD_GRAYSCALE)
         if self.transform:
-            if self.apply_landmark_tf:
+            if self.apply_dropout_tf:
                 # Simulate facial accessories and external occlusions
                 keypoints = self.landmarks[idx]
-                landmark_tf = A.Compose([
-                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(2, 2), dropout_width_range=(2, 2), fill_value=0)
+                dropout_tf = A.Compose([
+                    A.OneOf([
+                        transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 6), dropout_width_range=(4, 6), fill_value=0),
+                        transforms.ALOTDropout(num_holes_range=(1, 1), hole_height_range=(8, 24), hole_width_range=(8, 24)),
+                        transforms.EdgeDropout(edge_height_range=(8, 16), edge_width_range=(8, 16), fill_value=0),
+                    ], p=0.5)
                 ])
-                image = landmark_tf(image=image)['image']
+                image = dropout_tf(image=image)['image']
             image = self.transform(image=image)['image']
     
         label = torch.tensor(self.labels[idx], dtype=torch.uint8)
@@ -122,20 +126,20 @@ def parse_data(data_split):
         # Write landmarks to disk
         np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'landmarks.npy'), out_landmarks)
 
-def get_datasets(augment_tf=None, apply_landmark_tf=False):
+def get_datasets(augment_tf=None, apply_dropout_tf=False):
     '''
     Return train, validation, and test datasets with optional 'augment_tf' transform to apply to train dataset
     '''
-    train_dataset = FER2013('train', augment_tf, apply_landmark_tf)
+    train_dataset = FER2013('train', augment_tf, apply_dropout_tf)
     valid_dataset = FER2013('val', transforms.simple_tf)
     test_dataset = FER2013('test', transforms.simple_tf)
     return train_dataset, valid_dataset, test_dataset
 
-def get_dataloaders(augment_tf=None, bs=64, apply_landmark_tf=False):
+def get_dataloaders(augment_tf=None, bs=64, apply_dropout_tf=False):
     '''
-    Return train, valid, and test DataLoaders with 'augment_tf' transform to apply to training set and batch size 'bs'. If apply_landmark_tf is True, then the image will also be augmented with LandmarksDropout
+    Return train, valid, and test DataLoaders with 'augment_tf' transform to apply to training set and batch size 'bs'. If apply_dropout_tf is True, then the image will also be augmented with *Dropout transforms
     '''
-    train, valid, test = get_datasets(augment_tf, apply_landmark_tf)
+    train, valid, test = get_datasets(augment_tf, apply_dropout_tf)
     train_loader = DataLoader(train, batch_size=bs, shuffle=True)
     valid_loader = DataLoader(valid, batch_size=bs, shuffle=False)
     test_loader = DataLoader(test, batch_size=bs, shuffle=True)
