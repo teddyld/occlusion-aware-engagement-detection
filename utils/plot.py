@@ -61,12 +61,12 @@ def plot_preprocess_step(data_split, which_ttv, process_function):
     plt.tight_layout()
     plt.show()
 
-def plot_augmentation(transform, apply_landmark_tf=False):
+def plot_augmentation(transform, apply_dropout_tf=False):
     '''
     Apply 'transform' four times to a random image in the FER2013 train set, plotting the resulting augmentations
     Arguments:
         transform (callable) - an albumentations transform
-        apply_landmark_tf (optional, boolean) - assert True to apply LandmarksDropout to image
+        apply_dropout_tf (optional, boolean) - assert True to apply *Dropout transforms to image
     '''
     train_dataset, _, _ = get_datasets()
     random_idx = random.randint(0, len(train_dataset) - 1)
@@ -82,12 +82,16 @@ def plot_augmentation(transform, apply_landmark_tf=False):
     # Plot augmented image
     for i, ax in enumerate(axes[1:].flat):
         img = image.copy()
-        if apply_landmark_tf:
+        if apply_dropout_tf:
             keypoints = train_dataset.get_landmarks()[random_idx]
-            landmark_tf = A.Compose([
-                transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(2, 2), dropout_width_range=(2, 2), fill_value=0)
+            dropout_tf = A.Compose([
+                A.OneOf([
+                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 6), dropout_width_range=(4, 6), fill_value=0),
+                    transforms.ALOTDropout(num_holes_range=(1, 1), hole_height_range=(8, 24), hole_width_range=(8, 24)),
+                    transforms.EdgeDropout(edge_height_range=(8, 16), edge_width_range=(8, 16), fill_value=0),
+                ], p=0.5)
             ])
-            img = landmark_tf(image=img)['image']
+            img = dropout_tf(image=img)['image']
         img = transform(image=img)['image'].permute(1, 2, 0).numpy()
         ax.imshow(img, cmap="gray")
         ax.set_title(f'Augmented Image {i + 1}')
