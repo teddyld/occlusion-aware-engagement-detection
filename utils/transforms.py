@@ -51,7 +51,6 @@ mae_tf = A.Compose([
     A.HorizontalFlip(),
     ToTensorV2(),
 ])
- 
 
 def get_transform(tf_name):
     """Return the transform parsed by tf_name
@@ -65,7 +64,5 @@ def get_transform(tf_name):
         return baseline_tf
     elif tf_name == 'occlusion_aware':
         return occlusion_aware_tf
-    elif tf_name == 'mae':
-        return mae_tf
     else:
         return None
