@@ -45,13 +45,6 @@ occlusion_aware_tf = A.Compose([
     ToTensorV2(),
 ])
 
-# MaskedAutoEncoder transform
-mae_tf = A.Compose([
-    A.RandomResizedCrop(size=(224, 224), scale=(0.8, 1.0), interpolation=cv2.INTER_LINEAR),
-    A.HorizontalFlip(),
-    ToTensorV2(),
-])
-
 def get_transform(tf_name):
     """Return the transform parsed by tf_name
         
