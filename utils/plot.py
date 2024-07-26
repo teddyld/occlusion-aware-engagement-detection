@@ -11,12 +11,13 @@ import utils.transforms as transforms
 import albumentations as A
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
+import os
 
 FER_CLASS_MAP = {
     0: 'angry',
     1: 'disgust',
     2: 'fear', 
-    3:'happy',
+    3: 'happy',
     4: 'sad',
     5: 'surprise',
     6: 'neutral'
@@ -248,4 +249,44 @@ def get_class_weights(DEVICE=None):
     labels = train_dataset.get_labels()
     class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(labels), y=labels)
     return torch.tensor(class_weights).float().to(DEVICE)
+
+def plot_compare_predictions(model1, model2, loader, device):
+    '''
+    Plot predictions of two models with true and predicted labels of DataLoader 'loader'
+    Arguments:
+        model1 - a PyTorch model
+        model2 - a PyTorch model
+        loader (iterable) - a DataLoader class from PyTorch which loads the FER2013 Dataset
+        device (string) - the PyTorch context to use
+    '''
+    model1.to(device)
+    model1.eval()
+    model2.to(device)
+    model2.eval()
+    _, axes = plt.subplots(nrows=3, ncols=4, figsize=(15, 10), subplot_kw={'xticks': [], 'yticks': []})
+    
+    # Make prediction
+    with torch.no_grad():
+        for inputs, true_labels in loader:
+            inputs, true_labels = inputs.to(device), true_labels.to(device)
+            outputs1 = model1(inputs.float())
+            outputs2 = model2(inputs.float())
+            _, predicted1 = torch.max(outputs1, 1)
+            _, predicted2 = torch.max(outputs2, 1)
+
+            for i, ax in enumerate(axes.flat):
+                image = inputs[i].cpu().numpy().transpose(1, 2, 0)
+                true_label = int(true_labels[i].cpu())
+                pred_label1 = int(predicted1[i].cpu())
+                pred_label2 = int(predicted2[i].cpu())
+                ax.imshow(image, cmap='gray')
+                
+                # Green indicates model2 improvement over model1
+                color = 'green' if true_label == pred_label2 and true_label != pred_label1 else 'red'
+                
+                ax.set_title(f'True: {FER_CLASS_MAP[true_label]}\nPredicted (simple): {FER_CLASS_MAP[pred_label1]} {"O" if true_label == pred_label1 else "X"}\nPredicted (occlusion_aware): {FER_CLASS_MAP[pred_label2]} {"O" if true_label == pred_label2 else "X"}', color=color)
+            break
+
+    plt.tight_layout()
+    plt.show()
     
