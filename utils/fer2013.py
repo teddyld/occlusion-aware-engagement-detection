@@ -93,6 +93,7 @@ def parse_data(data_split):
 
         # Write images to disk
         image_idx = 0
+        landmark_found = 0
         loop = tqdm(enumerate(images), total=len(images), leave=True)
         for idx, image in loop:
             loop.set_description(f'Writing {ttv} dataset to disk')
@@ -107,6 +108,7 @@ def parse_data(data_split):
             face_features = detect.detect_face_features(image_path)
             
             if face_features:
+                landmark_found += 1
                 bbox, landmarks = face_features
                 image = cv2.imread(image_path)
                 # Crop to image bbox region
@@ -125,6 +127,8 @@ def parse_data(data_split):
         
         # Write landmarks to disk
         np.save(os.path.join(config.DATA_PATH, 'annotations', str(ttv) + '_' + 'landmarks.npy'), out_landmarks)
+    
+        print(f"CompreFace succesfully detected a face {landmark_found / image_idx} of times in the {ttv} set")
 
 def get_datasets(augment_tf=None, apply_dropout_tf=False):
     '''
