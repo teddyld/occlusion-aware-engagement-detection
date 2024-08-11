@@ -26,6 +26,7 @@ class FER2013(Dataset):
         self.transform = transform
         self.ttv = ttv
         self.apply_dropout_tf = apply_dropout_tf
+
     def __len__(self):
         return len(self.labels)
     
