@@ -14,9 +14,10 @@ import albumentations as A
 
 DAISEE_LABEL_MAP = {
     'Boredom': 0,
-    'Engagement': 1,
-    'Frustration': 2,
-    'Confusion': 3
+    'Engaged': 1,
+    'Disengaged': 2,
+    'Frustration': 3,
+    'Confusion': 4
 }
 
 DAISEE_GENDER_MAP = {
@@ -208,7 +209,10 @@ def get_image_frame_label(img_name, labels):
     if all(boredom > i for i in [engagement, frustration, confusion]):
         return DAISEE_LABEL_MAP['Boredom']
     elif all(engagement > i for i in [boredom, frustration, confusion]):
-        return DAISEE_LABEL_MAP['Engagement']
+        if engagement < 2:
+            return DAISEE_LABEL_MAP['Disengaged']
+        else:
+            return DAISEE_LABEL_MAP['Engaged']
     elif all(frustration > i for i in [boredom, engagement, confusion]):
         return DAISEE_LABEL_MAP['Frustration']
     elif all(confusion > i for i in [boredom, engagement, frustration]):
@@ -243,7 +247,8 @@ def print_dataset_statistics(ttv, labels, valid_clips, missing_clips):
 
     daisee_frequency = {
         'Boredom': 0,
-        'Engagement': 0,
+        'Engaged': 0,
+        'Disengaged': 0,
         'Frustration': 0,
         'Confusion': 0,
     }
@@ -270,7 +275,10 @@ def print_dataset_statistics(ttv, labels, valid_clips, missing_clips):
             if all(boredom > i for i in [engagement, frustration, confusion]):
                 daisee_frequency['Boredom'] += 1
             elif all(engagement > i for i in [boredom, frustration, confusion]):
-                daisee_frequency['Engagement'] += 1
+                if engagement < 2:
+                    daisee_frequency['Disengaged'] += 1
+                else:
+                    daisee_frequency['Engaged'] += 1
             elif all(frustration > i for i in [boredom, engagement, confusion]):
                 daisee_frequency['Frustration'] += 1
             elif all(confusion > i for i in [boredom, engagement, frustration]):
