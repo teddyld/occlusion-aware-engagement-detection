@@ -64,9 +64,9 @@ class VggFeatures(nn.Module):
 
 
 class VggNet(VggFeatures):
-    def __init__(self, drop=0.2):
+    def __init__(self, num_classes, drop=0.2):
         super().__init__(drop)
-        self.lin3 = nn.Linear(4096, 7)
+        self.lin3 = nn.Linear(4096, num_classes)
 
     def forward(self, x):
         x = super().forward(x)
