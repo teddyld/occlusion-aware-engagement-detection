@@ -13,16 +13,24 @@ class LandmarksDropout(ImageOnlyTransform):
         dropout_height_range (Tuple[int, int]): Defines the minimum and maximum pixels of the dropout height, providing variability in dropout size.
         dropout_width_range (Tuple[int, int]): Defines the minimum and maximum pixels of the dropout width, providing variability in dropout size.
         fill_value (ColorType, Literal["random"]): Specifies the value used to fill the cropped regions. This can be a constant value, or 'random' which fills the region with random noise.
+        inverse (bool): Defines whether to apply the dropout to regions outside of the facial features. If True, zeroes the probability of applying dropout to the 'nose' landmark.
         p (float): Probability of applying the transform. Default: 0.5.
     
     """
-    def __init__(self, landmarks, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 4), dropout_width_range=(4, 4), fill_value=0, always_apply=False, p=0.5):
+    def __init__(self, landmarks, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 4), dropout_width_range=(4, 4), fill_value=0, inverse=False, always_apply=False, p=0.5):
         super().__init__(always_apply, p)
         self.landmarks = landmarks
+        
+        if inverse:
+            landmarks_weights = list(landmarks_weights)
+            landmarks_weights[1] = 0
+            landmarks_weights = tuple(landmarks_weights)
+
         self.landmarks_weights = landmarks_weights
         self.dropout_height_range = dropout_height_range
         self.dropout_width_range = dropout_width_range
         self.fill_value = fill_value
+        self.inverse = inverse
         self.validate_landmarks(landmarks)
         self.validate_landmarks_weights(landmarks_weights)
         self.validate_range(dropout_height_range, 'dropout_height_range')
@@ -64,7 +72,7 @@ class LandmarksDropout(ImageOnlyTransform):
             return img
         else:
         # Face detected
-            return functional.landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, self.fill_value)
+            return functional.landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, self.fill_value, self.inverse)
     
     def get_random_feature_landmarks(self):
         """Get the randomly selected feature and its landmarks by choosing from the normalized probability of landmarks_weight"""

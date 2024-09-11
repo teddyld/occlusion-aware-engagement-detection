@@ -34,7 +34,7 @@ def edge_dropout(img, edge_height, edge_width, edge_name, fill_value):
         raise ValueError(f"Edge name must be top, bottom, left, or right. Got:{edge_name}")
     return img
 
-def landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, fill_value):
+def landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, fill_value, inverse):
     """Dropout a facial feature of an image using the image landmarks and fill it with fill_value. For example, if the feature is 'eyes' it will dropout the eyes with a rectangular region.  
     
     Args:
@@ -44,7 +44,9 @@ def landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, fi
         dropout_height (int): The height of the dropout region
         dropout_width (int): The width of the dropout region.
         fill_value (ColorType, Literal["random"]): The fill value to use for the dropout. Can be a single integer or the string "random" to fill with random noise
+        inverse (bool): Whether to dropout the facial feature or the 'inverse' of the facial feature
     """
+    original_img = img.copy()
     img = img.copy()
     height, width = img.shape[:2]
     # Create one-indexed 2d graph
@@ -58,6 +60,10 @@ def landmarks_dropout(img, landmarks, feature, dropout_height, dropout_width, fi
         x, y = landmarks[0][0], landmarks[0][1]
         dropout_shape = (dropout_height * 2, dropout_width * 2)
         img[y - dropout_height:y + dropout_height, x - dropout_width:x + dropout_width] = generate_fill(dropout_shape, fill_value, img.dtype)
+    
+    if inverse:
+        img = original_img - img
+        
     return img
 
 def generate_fill(dropout_shape, fill_value, dtype):
