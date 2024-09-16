@@ -48,7 +48,7 @@ class FER2013(Dataset):
             image = self.transform(image=image)['image']
     
         label = torch.tensor(self.labels[idx], dtype=torch.uint8)
-        return image, label
+        return image, label, -1
     
     # Debugging/Helper Methods
     def get_labels(self):

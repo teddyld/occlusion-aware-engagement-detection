@@ -6,12 +6,13 @@ from sklearn.metrics import confusion_matrix, classification_report
 import torch
 import cv2
 import utils.detect as detect
-from utils.fer2013 import get_datasets
+import utils.fer2013 as fer2013
+import utils.daisee as daisee
 import utils.transforms as transforms
 import albumentations as A
-from sklearn.utils.class_weight import compute_class_weight
-import numpy as np
-import os
+import utils.loops as loops
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 FER_CLASS_MAP = {
     0: 'angry',
@@ -25,56 +26,57 @@ FER_CLASS_MAP = {
 
 FER_CLASS_LABELS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 
-def plot_preprocess_step(data_split, which_ttv, process_function):
-    '''
-    Plot a random image from the data_split besides the image with 'process_function' applied to it
-    Arguments:
-        data_split (dictionary) - dictionary containing keys 'train', 'val', and 'test' with values being the DataFrame of the split
-        which_ttv (string) - 'train', 'val' or 'test'
-        process_function (callable) - the preprocessing function to be applied on an image
-    '''
-    if which_ttv not in ['train', 'val', 'test']:
-        print(f'{which_ttv} is not a valid argument')
-        return
+DAISEE_CLASS_LABELS = ['Boredom', 'Engagement', 'Confusion', 'Frustration']
 
-    dataset = data_split[which_ttv]
-    
-    try:
-        images = dataset[' pixels'].tolist()
-        labels = dataset['emotion'].tolist()
-    except Exception as e:
-        print(f'Error: {e}. Check if icml_face_data.csv is correct')
-        
-    random_image_idx = random.randint(0, len(images))
-    
-    fig, ax = plt.subplots(1, 2, figsize=(8, 8), subplot_kw={'xticks': [], 'yticks': []})
+DAISEE_CLASS_LABELS_DEGREES = ['VL', 'L', 'H', 'VH']
 
-    ax[0].set_title('Original Image')
-    ax[1].set_title('Pre-processed Image')
-    
-    fig.suptitle(f'Image: {which_ttv}_{random_image_idx}.jpg \nClass: {FER_CLASS_MAP[labels[random_image_idx]]}', y=0.8)
-    
-    
-    image = images[random_image_idx]
-    ax[0].imshow(image, cmap="gray")
-    ax[1].imshow(process_function(image), cmap="gray")
-    
-    plt.tight_layout()
-    plt.show()
-
-def plot_augmentation(transform, apply_dropout_tf=False):
+def one_hot_label_decode(one_hot_label, benchmark):
     '''
-    Apply 'transform' four times to a random image in the FER2013 train set, plotting the resulting augmentations
+    Return the decoded one-hot label of the DAiSEE dataset with the given benchmark metric
+    '''    
+    if benchmark == "Boredom":
+        label = one_hot_label[:4]
+    elif benchmark == "Engagement":
+        label = one_hot_label[4:8]
+    elif benchmark == "Confusion":
+        label = one_hot_label[8:12]
+    else:
+        label = one_hot_label[12:]
+
+    
+    if label == [1, 0, 0, 0]:
+        return "Very Low " + benchmark
+    elif label == [0, 1, 0, 0]:
+        return "Low " + benchmark
+    elif label == [0, 0, 1, 0]:
+        return "High " + benchmark
+    else:
+       return "Very High " + benchmark
+                
+def plot_augmentation(transform, dataset_name, benchmark, apply_dropout_tf=False):
+    '''
+    Apply 'transform' four times to a random image in the train set, plotting the resulting augmentations
     Arguments:
         transform (callable) - an albumentations transform
+        dataset_name (string) - Defines the dataset to take source images from. Must be one of "FER2013" or "DAiSEE"
+        benchmark (string) - Defines the benchmark metric to reference in labelling of figures. Must be one of "Boredom", "Engagement", "Confusion", "Frustration"
         apply_dropout_tf (optional, boolean) - assert True to apply *Dropout transforms to image
     '''
-    train_dataset, _, _ = get_datasets()
+    if dataset_name == 'FER2013':
+        train_dataset, _, _ = fer2013.get_datasets()
+    else:
+        train_dataset, _, _ = daisee.get_datasets()
+
     random_idx = random.randint(0, len(train_dataset) - 1)
-    image, label = train_dataset[random_idx]
+    image, label, _ = train_dataset[random_idx]
     
     fig, axes = plt.subplots(1, 5, figsize=(10, 4), subplot_kw={'xticks': [], 'yticks': []})
-    fig.suptitle(f'Image label: {FER_CLASS_MAP[label.item()]}', y=0.82, size=16)
+    
+    if dataset_name == 'FER2013':
+        fig.suptitle(f'Image label: {FER_CLASS_MAP[label.item()]}', y=0.82, size=16)
+    else:
+        label = one_hot_label_decode(label.tolist(), benchmark)
+        fig.suptitle(f'Image label:\n {label}', y=0.82, size=16)
     
     # Plot original image
     axes[0].imshow(image, cmap="gray")
@@ -88,9 +90,10 @@ def plot_augmentation(transform, apply_dropout_tf=False):
             dropout_tf = A.Compose([
                 A.OneOf([
                     transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 6), dropout_width_range=(4, 6), fill_value=0),
+                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(6, 8), dropout_width_range=(6, 8), fill_value=0, inverse=True),
                     transforms.ALOTDropout(num_holes_range=(1, 1), hole_height_range=(8, 24), hole_width_range=(8, 24)),
                     transforms.EdgeDropout(edge_height_range=(8, 16), edge_width_range=(8, 16), fill_value=0),
-                ], p=0.5)
+                ], p=1)
             ])
             img = dropout_tf(image=img)['image']
         img = transform(image=img)['image'].permute(1, 2, 0).numpy()
@@ -100,39 +103,57 @@ def plot_augmentation(transform, apply_dropout_tf=False):
     plt.tight_layout()
     plt.show()
 
-def plot_fer_dataset(loader):
+def plot_dataset(loader, dataset_name, benchmark):
     '''
     Plot eight images from a single batch of a DataLoader
     Arguments:
-        loader (iterable) - a DataLoader class from PyTorch which loads the FER2013 Dataset
+        loader (iterable) - Defines the DataLoader which loads the FER2013 or DAiSEE Dataset
+        dataset_name (string) - Defines the dataset to reference in labelling of figures. Must be one of "FER2013" or "DAiSEE"
+        benchmark (string) - Defines the benchmark metric to reference in labelling of figures. Must be one of "Boredom", "Engagement", "Confusion", "Frustration"
     '''
     _, axes = plt.subplots(nrows=2, ncols=4, figsize=(10, 5), subplot_kw={'xticks': [], 'yticks': []})
+    
+    images, labels, _ = next(iter(loader))
 
-    for images, labels in loader:
-        for i, ax in enumerate(axes.flat):
-            image = images[i].cpu().numpy().transpose(1, 2, 0)
+    for i, ax in enumerate(axes.flat):
+        image = images[i].cpu().numpy().transpose(1, 2, 0)
+        
+        ax.imshow(image, cmap='gray')
+        
+        if dataset_name == "FER2013":
             label = int(labels[i].cpu())
-            
-            ax.imshow(image, cmap='gray')
-            
             ax.set_title(f'{FER_CLASS_MAP[label]}')
-        break
+        else:
+            label = one_hot_label_decode(labels[i].cpu().tolist(), benchmark)
+            ax.set_title(label)
+
 
     plt.tight_layout()
     plt.show()
 
-def plot_class_distribution(dataset):
+def plot_class_distribution(dataset_name, benchmark):
     '''
-    Plot the class distribution of the FER2013 Dataset in a seaborn countplot
+    Plot the class distribution of the FER2013 or DAiSEE train dataset in a seaborn countplot
     Arguments:
-        dataset (class) - a PyTorch Dataset
+        dataset_string (string) - Defines the reference dataset. Must be one of "FER2013" or "DAiSEE"
+        benchmark (string) - Defines the benchmark metric to reference in labelling of figures. Must be one of "Boredom", "Engagement", "Confusion", "Frustration"
     '''
-    plot = sns.countplot(x=dataset.get_labels(), hue=dataset.get_labels(), legend=False)
-    plot.set_title('Class Distribution')
-    plot.set_xlabel('Class')
-    plot.set_ylabel('Count')
-    plot.set_xticks(range(len(FER_CLASS_LABELS)))
-    plot.set_xticklabels(FER_CLASS_LABELS)
+    if dataset_name not in ['FER2013', 'DAiSEE']:
+        raise ValueError(f"Error: dataset must be one of 'FER2013' or 'DAiSEE'. Got {dataset_name}")
+
+    if dataset_name == 'FER2013':
+        dataset, _, _ = fer2013.get_datasets()
+        plot = sns.countplot(x=dataset.get_labels(), hue=dataset.get_labels(), legend=False)
+        plot.set_title(f'{dataset_name} Class Distribution')
+        plot.set_xlabel('Class')
+        plot.set_ylabel('Count')
+        plot.set_xticks(range(len(FER_CLASS_LABELS)))
+        plot.set_xticklabels(FER_CLASS_LABELS)
+        
+        for c in plot.containers:
+            plot.bar_label(c, fmt=lambda x: f"{x:0.0f}" if x > 0 else "")
+    else:
+        daisee.plot_label_frequency("Train", benchmark)
 
 def plot_training_history(results):
     '''
@@ -160,8 +181,26 @@ def plot_training_history(results):
 
     plt.show()
     
+def plot_gender_history(gender_accuracy):
+    '''
+    Plot gender history with male and female demographic accuracy
+    Arguments:
+        gender_accuracy (dictionary) - containing keys 'male' and 'female' with value of type List
+    '''
+    if len(gender_accuracy["male"]) == 0 or len(gender_accuracy["female"]) == 0:
+        return
     
-def plot_confusion_matrix(results):
+    plt.figure()
+    plt.plot(gender_accuracy['male'])
+    plt.plot(gender_accuracy['female'])
+    plt.title('Gender Accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Male', 'Female'], loc='upper left')
+
+    plt.show()
+
+def plot_confusion_matrix(results, benchmark, dataset_name):
     '''
     Plot the confusion matrix of the training results, representing the epoch with best validation accuracy
     Arguments:
@@ -170,43 +209,55 @@ def plot_confusion_matrix(results):
     cm = confusion_matrix(results['y_true'], results['y_pred'])
 
     plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="viridis", xticklabels=FER_CLASS_LABELS, yticklabels=FER_CLASS_LABELS)
+    
+    if dataset_name == 'FER2013':
+        sns.heatmap(cm, annot=True, fmt="d", cmap="viridis", xticklabels=FER_CLASS_LABELS, yticklabels=FER_CLASS_LABELS)
+    else:
+        daisee_labels = [x + "-" + benchmark for x in DAISEE_CLASS_LABELS_DEGREES]
+        sns.heatmap(cm, annot=True, fmt="d", cmap="viridis", xticklabels=daisee_labels, yticklabels=daisee_labels)
+    
     plt.title('Confusion Matrix')
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.show()
 
-    
-def plot_predictions(model, loader, device):
+def plot_predictions(model, loader, benchmark, dataset_name):
     '''
     Plot model predictions with true and predicted labels of the DataLoader 'loader'
     Arguments:
         model - a PyTorch model
-        loader (iterable) - a DataLoader class from PyTorch which loads the FER2013 Dataset
-        device (string) - the PyTorch context to use
+        loader (iterable) - a DataLoader class from PyTorch which loads the Dataset
+        benchmark (string) - Defines the benchmark metric to reference in labelling of figures. Must be one of "Boredom", "Engagement", "Confusion", "Frustration"
+        dataset_name (string) - Defines the class label to reference in labelling of figures. Must be one of "FER2013" or "DAiSEE" 
     '''
-    model.to(device)
+    model.to(DEVICE)
     model.eval()
     _, axes = plt.subplots(nrows=2, ncols=4, figsize=(10, 5), subplot_kw={'xticks': [], 'yticks': []})
 
     # Make prediction on test set
     with torch.no_grad():
-        for inputs, true_labels in loader:
-            inputs, true_labels = inputs.to(device), true_labels.to(device)
-            outputs = model(inputs.float())
-            _, predicted = torch.max(outputs, 1)
+        inputs, labels, _ = next(iter(loader))
+        
+        inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+        if benchmark:
+            labels = loops.benchmark_to_labels(labels, benchmark).to(DEVICE)
+        
+        outputs = model(inputs.float())
+        _, predicted = torch.max(outputs, 1)
 
-            for i, ax in enumerate(axes.flat):
-                image = inputs[i].cpu().numpy().transpose(1, 2, 0)
-                true_label = int(true_labels[i].cpu())
-                pred_label = int(predicted[i].cpu())
-                
-                ax.imshow(image, cmap='gray')
-                
-                color = 'green' if true_label == pred_label else 'red'
+        for i, ax in enumerate(axes.flat):
+            image = inputs[i].cpu().numpy().transpose(1, 2, 0)
+            true_label = int(labels[i].cpu())
+            pred_label = int(predicted[i].cpu())
+            
+            ax.imshow(image, cmap='gray')
+            color = 'green' if true_label == pred_label else 'red'
+            
+            if dataset_name == "FER2013":
                 ax.set_title(f'True: {FER_CLASS_MAP[true_label]}\nPredicted: {FER_CLASS_MAP[pred_label]}', color=color)
-            break # break early to test only 1 batch
-
+            else:
+                ax.set_title(f'True: {DAISEE_CLASS_LABELS_DEGREES[true_label]}-{benchmark}\nPredicted: {DAISEE_CLASS_LABELS_DEGREES[pred_label]}-{benchmark}', color=color)
+                
     plt.tight_layout()
     plt.show()
     
@@ -228,65 +279,63 @@ def plot_image_features(image_path, bbox, landmarks):
     rect = detect.bbox_to_rect(bbox)
     ax.add_patch(rect)
     
-def display_classification_report(results):
+def display_classification_report(results, benchmark, dataset_name):
     '''
     Display the classification report of the training results, representing the epoch with best validation accuracy
     Arguments:
         results (dictionary) - containing keys 'y_true' and 'y_pred' with value of type List 
+        dataset_string (string) - Defines the reference dataset. Must be one of "FER2013" or "DAiSEE"
     '''
     print('=== Classification Report ===')
-    print(classification_report(results['y_true'], results['y_pred'], target_names=FER_CLASS_LABELS, digits=4))
-    
-def get_class_weights(DEVICE=None):
-    '''
-    Return class weights of train dataset
-    '''
-    if not DEVICE:
-        DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if dataset_name == 'FER2013':
+        print(classification_report(results['y_true'], results['y_pred'], target_names=FER_CLASS_LABELS, digits=4))
+    else:
+        daisee_labels = [x + "-" + benchmark for x in DAISEE_CLASS_LABELS_DEGREES]        
+        print(classification_report(results['y_true'], results['y_pred'], target_names=daisee_labels, digits=4))
 
-    train_dataset, _, _ = get_datasets()
-    plot_class_distribution(train_dataset)
-    labels = train_dataset.get_labels()
-    class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(labels), y=labels)
-    return torch.tensor(class_weights).float().to(DEVICE)
-
-def plot_compare_predictions(model1, model2, loader, device):
+def plot_compare_predictions(model1, model2, loader, benchmark, dataset_name):
     '''
     Plot predictions of two models with true and predicted labels of DataLoader 'loader'
     Arguments:
         model1 - a PyTorch model
         model2 - a PyTorch model
-        loader (iterable) - a DataLoader class from PyTorch which loads the FER2013 Dataset
-        device (string) - the PyTorch context to use
+        loader (iterable) - a DataLoader class from PyTorch which loads the Dataset
+        benchmark (string) - Defines the benchmark metric to reference in labelling of figures. Must be one of "Boredom", "Engagement", "Confusion", "Frustration"
+        dataset_name (string) - Defines the class label to reference in labelling of figures. Must be one of "FER2013" or "DAiSEE" 
     '''
-    model1.to(device)
+    model1.to(DEVICE)
     model1.eval()
-    model2.to(device)
+    model2.to(DEVICE)
     model2.eval()
-    _, axes = plt.subplots(nrows=3, ncols=4, figsize=(15, 10), subplot_kw={'xticks': [], 'yticks': []})
+    _, axes = plt.subplots(nrows=3, ncols=4, figsize=(20, 10), subplot_kw={'xticks': [], 'yticks': []})
     
     # Make prediction
     with torch.no_grad():
-        for inputs, true_labels in loader:
-            inputs, true_labels = inputs.to(device), true_labels.to(device)
-            outputs1 = model1(inputs.float())
-            outputs2 = model2(inputs.float())
-            _, predicted1 = torch.max(outputs1, 1)
-            _, predicted2 = torch.max(outputs2, 1)
+        inputs, labels, _ = next(iter(loader))
+        inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
+            
+        if benchmark:
+            labels = loops.benchmark_to_labels(labels, benchmark).to(DEVICE)
+            
+        outputs1 = model1(inputs.float())
+        outputs2 = model2(inputs.float())
+        _, predicted1 = torch.max(outputs1, 1)
+        _, predicted2 = torch.max(outputs2, 1)
 
-            for i, ax in enumerate(axes.flat):
-                image = inputs[i].cpu().numpy().transpose(1, 2, 0)
-                true_label = int(true_labels[i].cpu())
-                pred_label1 = int(predicted1[i].cpu())
-                pred_label2 = int(predicted2[i].cpu())
-                ax.imshow(image, cmap='gray')
-                
-                # Green indicates model2 improvement over model1
-                color = 'green' if true_label == pred_label2 and true_label != pred_label1 else 'red'
-                
+        for i, ax in enumerate(axes.flat):
+            image = inputs[i].cpu().numpy().transpose(1, 2, 0)
+            true_label = int(labels[i].cpu())
+            pred_label1 = int(predicted1[i].cpu())
+            pred_label2 = int(predicted2[i].cpu())
+            ax.imshow(image, cmap='gray')
+            
+            # Green indicates model2 improvement over model1
+            color = 'green' if true_label == pred_label2 and true_label != pred_label1 else 'red'
+            
+            if dataset_name == "FER2013":
                 ax.set_title(f'True: {FER_CLASS_MAP[true_label]}\nPredicted (simple): {FER_CLASS_MAP[pred_label1]} {"O" if true_label == pred_label1 else "X"}\nPredicted (occlusion_aware): {FER_CLASS_MAP[pred_label2]} {"O" if true_label == pred_label2 else "X"}', color=color)
-            break
-
+            else:
+                ax.set_title(f'True: {DAISEE_CLASS_LABELS_DEGREES[true_label]}-{benchmark}\nPredicted (simple): {DAISEE_CLASS_LABELS_DEGREES[pred_label1]}-{benchmark} {"O" if true_label == pred_label1 else "X"}\nPredicted (occlusion_aware): {DAISEE_CLASS_LABELS_DEGREES[pred_label2]}-{benchmark} {"O" if true_label == pred_label2 else "X"}', color=color)
+            
     plt.tight_layout()
     plt.show()
-    
