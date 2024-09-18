@@ -74,8 +74,13 @@ def evaluate_model(model, loader, criterion, benchmark):
             
         valid_accuracy = correct_predictions / total_samples    
         valid_loss = running_loss / total_samples
-        male_accuracy = correct_male_predictions / total_male_samples
-        female_accuracy = correct_female_predictions / total_female_samples
+        
+        if benchmark:
+            male_accuracy = correct_male_predictions / total_male_samples
+            female_accuracy = correct_female_predictions / total_female_samples
+        else: # No gender information available for FER2013 dataset
+            male_accuracy = 0
+            female_accuracy = 0
 
         print(f'validation_loss: {valid_loss:.4f} - valid_accuracy: {valid_accuracy:.4f}')
         if benchmark:
