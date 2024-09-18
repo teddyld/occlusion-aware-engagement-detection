@@ -141,3 +141,31 @@ def get_random_alot_image(data_path, dtype, width, height):
         return alot_img.astype(dtype=dtype)
     except:
         raise ValueError(f'The directory {data_path} did not have the expected file structure')
+    
+def border_dropout(img, border_size, fill_value, ksize):
+    """Dropout the border of an image and fill it with fill_value
+    
+    Args:
+        img (np.ndarray): The image to augment
+        border_size (int): The height/width of the dropout region when cutting from border of the image
+        fill_value (ColorType, Literal["blur"]): The fill value to use for the dropout. Can be a single integer or the string "blur" to fill the border with a Gaussian blur
+        ksize (int): The kernel size for the Gaussian blur
+    """
+    img = img.copy()
+    
+    height, width = img.shape[:2]
+    
+    # Apply Gaussian blur to border of image
+    if isinstance(fill_value, str) and fill_value == "blur":
+        blurred_img = cv2.GaussianBlur(img, (ksize, ksize), 0)
+        img[0:border_size, :]  = blurred_img[0:border_size, :]
+        img[height-border_size:height, :] = blurred_img[height-border_size:height, :]
+        img[:, 0:border_size] = blurred_img[:, 0:border_size]
+        img[:, width-border_size:width] = blurred_img[:, width-border_size:width]
+    else:
+        img[0:border_size, :] = fill_value
+        img[height-border_size:height, :] = fill_value
+        img[:, 0:border_size] = fill_value
+        img[:, width-border_size:width] = fill_value
+
+    return img
