@@ -79,39 +79,44 @@ class DAiSEE(Dataset):
     def get_genders(self):
         return self.genders
     
-def extract_frames(ttv, verbose=True):
+def extract_frames(ttv, balance=None, verbose=True):
     """
     Extracts frames from the DAiSEE dataset using ffmpeg.
     Arguments:
         ttv (string): Data split to extract i.e. one of 'Train', 'Validation', or 'Test'
-        verbose (boolean, optional): Optional boolean that if asserted True will print the frequency of each valid class and the number of invalid entries  
+        verbose (boolean, optional): Optional boolean that if asserted True will print the frequency of each valid class and the number of invalid entries
+        balance (string, optional): Optional string defining the benchmark metric to balance the number of image frames of each label degree in the train dataset by sampling more frames per second. Only "Engagement" is supported
     """
     if ttv not in ['Train', 'Validation', 'Test']:
         raise ValueError(f"ttv={ttv} is not 'Train', 'Validation', 'Test'") 
     
+    if balance and balance not in ['Engagement'] and ttv != "Train":
+        raise ValueError(f"Unsupported inputs for balance={balance} and ttv={ttv}")
+    
     labels = pd.read_csv(os.path.join(config.DAISEE_ANNOTATIONS_PATH, f"{ttv}Labels.csv"))
     
     users = os.listdir(f'{config.DAISEE_DATA_PATH}/{ttv}')
-    
     pbar = tqdm(users, leave=True)
     for user in pbar:
         pbar.set_description(f"Writing {ttv} dataset to disk")
         currUser_path = os.path.join(config.DAISEE_DATA_PATH, ttv, user)
         currUser = os.listdir(currUser_path)
         for extract in currUser:
-            try:
-                clip = os.listdir(f'{currUser_path}/{extract}')[0]
-                src_path = os.path.join(currUser_path, extract) + '/'
-                dest_path = os.path.join(config.DAISEE_DATA_PATH, ttv)
-                if clip_has_valid_label(clip, labels):
-                    split_video(clip, clip[:-4], src_path, dest_path)
-                # Remove clip folder
-                shutil.rmtree(src_path)
-            except IndexError:
-                print(f'Index does not exist at user {user} at clip {extract}')
+            extract_path = os.path.join(currUser_path, extract)
+            clips = os.listdir(extract_path)
+            src_path = os.path.join(currUser_path, extract) + '/'
+            dest_path = os.path.join(config.DAISEE_DATA_PATH, ttv)
+            for clip in clips:
+                try:
+                    if clip_has_valid_label(clip, labels):
+                        split_video(clip, clip[:-4], src_path, dest_path, balance, labels)
+                    
+                except IndexError:
+                    print(f'Index does not exist at user {user} at clip {extract}')
+
         # Remove user folder
         shutil.rmtree(currUser_path)
-    
+
     out_labels = []
     out_landmarks = []
     out_genders = []
@@ -162,11 +167,25 @@ def extract_frames(ttv, verbose=True):
         print(f"CompreFace succesfully detected a face {(landmark_found / len(all_files)) * 100}% of times in the {ttv} set")
         plot_dataset_statistics(ttv)
 
-def split_video(video_file, image_name_prefix, src_path, destination_path):
+def split_video(video_file, image_name_prefix, src_path, destination_path, balance, labels):
     """
-    Split the 10 second video clip into 10 frames, 1 frame/second    
+    Split the 10 second video clip into 10 frames at 1fps.
+    If balance is set to "Engagement", then the "Low" and "Very Low" engagement labels will be sampled at 30fps and  to balance the dataset   
     """
-    return subprocess.run('ffmpeg -i "' + src_path+video_file + '" -r 1 -vframes 10 ' + image_name_prefix + '_%d.jpg -hide_banner', shell=True, cwd=destination_path, capture_output=True)
+    fps = 1
+    nframes = 10
+    if balance == "Engagement":
+        row = labels[labels['ClipID'] == video_file]
+        engagement = row["Engagement"].item()
+        
+        if engagement == 0:
+            fps = 30
+            nframes = 300
+        elif engagement == 1:
+            fps = 10
+            nframes = 100
+
+    return subprocess.run('ffmpeg -i "' + src_path+video_file + '" -r ' + str(fps) + ' -vframes ' + str(nframes) + ' ' + image_name_prefix + '_%d.jpg -hide_banner', shell=True, cwd=destination_path, capture_output=True)
 
 def clip_has_valid_label(clip_id, labels):
     """
