@@ -99,7 +99,10 @@ def alot_dropout(img, data_path, holes):
     """
     img = img.copy()
     for x1, y1, x2, y2 in holes:
-        alot_img = get_random_alot_image(data_path, img.dtype, x2 - x1, y2 - y1)
+        try:
+            alot_img = get_random_alot_image(data_path, img.dtype, x2 - x1, y2 - y1)
+        except: 
+            return img
         for i, row in enumerate(range(y1, y2)):
             for j, col in enumerate(range(x1, x2)):
                 img[row, col] = alot_img[i, j]
@@ -139,8 +142,9 @@ def get_random_alot_image(data_path, dtype, width, height):
         # Resize ALOT image
         alot_img = cv2.resize(alot_img, dsize=(width, height))
         return alot_img.astype(dtype=dtype)
-    except:
-        raise ValueError(f'The directory {data_path} did not have the expected file structure')
+    # In rare cases where the image IEND chunk is incorrect or the data directory is incorrect
+    except Exception as e:
+        raise ValueError(e)
     
 def border_dropout(img, border_size, fill_value, ksize):
     """Dropout the border of an image and fill it with fill_value
