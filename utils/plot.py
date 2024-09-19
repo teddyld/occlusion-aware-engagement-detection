@@ -90,7 +90,6 @@ def plot_augmentation(transform, dataset_name, benchmark, apply_dropout_tf=False
             dropout_tf = A.Compose([
                 A.OneOf([
                     transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(4, 6), dropout_width_range=(4, 6), fill_value=0),
-                    transforms.LandmarksDropout(landmarks=keypoints, landmarks_weights=(1, 1, 1), dropout_height_range=(6, 8), dropout_width_range=(6, 8), fill_value=0, inverse=True),
                     transforms.ALOTDropout(num_holes_range=(1, 1), hole_height_range=(8, 24), hole_width_range=(8, 24)),
                     transforms.EdgeDropout(edge_height_range=(8, 16), edge_width_range=(8, 16), fill_value=0),
                 ], p=1)

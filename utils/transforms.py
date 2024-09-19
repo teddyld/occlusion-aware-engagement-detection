@@ -4,6 +4,7 @@ import cv2
 from utils.dropouts.alot_dropout import ALOTDropout
 from utils.dropouts.landmarks_dropout import LandmarksDropout
 from utils.dropouts.edge_dropout import EdgeDropout
+from utils.dropouts.border_dropout import BorderDropout
 
 # Simple transform
 simple_tf = A.Compose([
