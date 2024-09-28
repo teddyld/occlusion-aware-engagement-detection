@@ -64,11 +64,11 @@ To run the occlusion recovery model (Masked Autoencoder) check out my other repo
 
 - FER-2013
 
-![fer.png](./images/fer_performance.JPG)
+<img src="./images/fer_performance.JPG" alt="fer performnace" width="550"/>
 
 - DAiSEE
 
-![fer.png](./images/daisee_performance.JPG)
+<img src="./images/daisee_performance.JPG" alt="daisee performnace" width="550"/>
 
 ### Occlusion Recovery (MAE)
 
