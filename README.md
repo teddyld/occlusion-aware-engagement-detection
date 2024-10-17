@@ -46,8 +46,6 @@ The FER-2013 dataset can be accessed on [Kaggle](https://www.kaggle.com/datasets
 
 The DAiSEE dataset can be accessed on the following [website](https://people.iith.ac.in/vineethnb/resources/daisee/index.html)
 
-Weights of model training will be available in releases by November 2024
-
 ## <a id="usage">Usage</a>
 
 Transforms are available in `./utils/dropouts` and `./utils/transforms.py`.
@@ -57,6 +55,8 @@ Data pre-processing is executed by running the cells in `daisee_data.ipynb` and 
 The notebook `model_run.ipynb` applies the transforms and runs training.
 
 To run the occlusion recovery model (Masked Autoencoder) check out my other repo [mae-torch](https://github.com/teddyld/mae-torch)
+
+Download model weights in repo releases.
 
 ## <a id="results">Results</a>
 
@@ -72,7 +72,15 @@ To run the occlusion recovery model (Masked Autoencoder) check out my other repo
 
 ### Occlusion Recovery (MAE)
 
-WIP
+<div align="center">
+  <img src=images/mae_fer2013_all_val.JPG/><br>
+  <small>Results of MAE experiments on the FER-2013 dataset</small>
+</div><br>
+
+<div align="center">
+  <img src=images/mae_daisee_all_val.JPG/><br>
+  <small>Results of MAE experiments on the DAiSEE dataset</small>
+</div><br>
 
 ## <a id="contacts">Contacts</a>
 
