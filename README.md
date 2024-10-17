@@ -56,7 +56,7 @@ The notebook `model_run.ipynb` applies the transforms and runs training.
 
 To run the occlusion recovery model (Masked Autoencoder) check out my other repo [mae-torch](https://github.com/teddyld/mae-torch)
 
-Download model weights in repo releases.
+Download model weights in [GitHub releases](https://github.com/teddyld/occlusion-aware-engagement-detection/releases/tag/v1.0).
 
 ## <a id="results">Results</a>
 
