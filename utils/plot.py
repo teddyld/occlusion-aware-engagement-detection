@@ -292,49 +292,58 @@ def display_classification_report(results, benchmark, dataset_name):
         daisee_labels = [x + "-" + benchmark for x in DAISEE_CLASS_LABELS_DEGREES]        
         print(classification_report(results['y_true'], results['y_pred'], target_names=daisee_labels, digits=4))
 
-def plot_compare_predictions(model1, model2, loader, benchmark, dataset_name):
+def plot_compare_predictions(simple_m, baseline_m, occlusion_m, loader):
     '''
-    Plot predictions of two models with true and predicted labels of DataLoader 'loader'
+    Plot predictions on the simple, baseline, and occlusion-aware strategies, comparing them on images in the dataloader.
     Arguments:
-        model1 - a PyTorch model
-        model2 - a PyTorch model
+        simple_m - a PyTorch model
+        baseline_m - a PyTorch model
+        occlusion_m - a PyTorch model
         loader (iterable) - a DataLoader class from PyTorch which loads the Dataset
-        benchmark (string) - Defines the benchmark metric to reference in labelling of figures. Must be one of "Boredom", "Engagement", "Confusion", "Frustration"
-        dataset_name (string) - Defines the class label to reference in labelling of figures. Must be one of "FER2013" or "DAiSEE" 
     '''
-    model1.to(DEVICE)
-    model1.eval()
-    model2.to(DEVICE)
-    model2.eval()
-    _, axes = plt.subplots(nrows=3, ncols=4, figsize=(20, 10), subplot_kw={'xticks': [], 'yticks': []})
+    simple_m.to(DEVICE)
+    simple_m.eval()
+    baseline_m.to(DEVICE)
+    baseline_m.eval()
+    occlusion_m.to(DEVICE)
+    occlusion_m.eval()
+
+    _, axes = plt.subplots(nrows=3, ncols=4, figsize=(15, 10), subplot_kw={'xticks': [], 'yticks': []})
     
     # Make prediction
     with torch.no_grad():
         inputs, labels, _ = next(iter(loader))
         inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
             
-        if benchmark:
-            labels = loops.benchmark_to_labels(labels, benchmark).to(DEVICE)
-            
-        outputs1 = model1(inputs.float())
-        outputs2 = model2(inputs.float())
-        _, predicted1 = torch.max(outputs1, 1)
-        _, predicted2 = torch.max(outputs2, 1)
+        simple_out = simple_m(inputs.float())
+        baseline_out = baseline_m(inputs.float())
+        occlusion_out = occlusion_m(inputs.float())
+        
+        _, simple_pred = torch.max(simple_out, 1)
+        _, baseline_pred = torch.max(baseline_out, 1)
+        _, occlusion_pred = torch.max(occlusion_out, 1)
 
         for i, ax in enumerate(axes.flat):
             image = inputs[i].cpu().numpy().transpose(1, 2, 0)
+            
             true_label = int(labels[i].cpu())
-            pred_label1 = int(predicted1[i].cpu())
-            pred_label2 = int(predicted2[i].cpu())
+            simple_label = int(simple_pred[i].cpu())
+            baseline_label = int(baseline_pred[i].cpu())
+            occlusion_label = int(occlusion_pred[i].cpu())
+
             ax.imshow(image, cmap='gray')
             
-            # Green indicates model2 improvement over model1
-            color = 'green' if true_label == pred_label2 and true_label != pred_label1 else 'red'
-            
-            if dataset_name == "FER2013":
-                ax.set_title(f'True: {FER_CLASS_MAP[true_label]}\nPredicted (simple): {FER_CLASS_MAP[pred_label1]} {"O" if true_label == pred_label1 else "X"}\nPredicted (occlusion_aware): {FER_CLASS_MAP[pred_label2]} {"O" if true_label == pred_label2 else "X"}', color=color)
-            else:
-                ax.set_title(f'True: {DAISEE_CLASS_LABELS_DEGREES[true_label]}-{benchmark}\nPredicted (simple): {DAISEE_CLASS_LABELS_DEGREES[pred_label1]}-{benchmark} {"O" if true_label == pred_label1 else "X"}\nPredicted (occlusion_aware): {DAISEE_CLASS_LABELS_DEGREES[pred_label2]}-{benchmark} {"O" if true_label == pred_label2 else "X"}', color=color)
+            # Label green when occlusion model correctly predicts over baseline and simple.
+            if true_label == occlusion_label and true_label != simple_label and true_label != baseline_label:
+                color = "green"
+            # Label blue when baseline model correctly predicts over simple model
+            elif true_label == baseline_label and true_label != simple_label:
+                color = "blue"
+            else: 
+                color = "red"
+
+            ax.set_title(f"True: {FER_CLASS_MAP[true_label]}\nOcclusion-aware: {FER_CLASS_MAP[occlusion_label]}\nBaseline: {FER_CLASS_MAP[baseline_label]}\nSimple: {FER_CLASS_MAP[simple_label]}", color=color)
+           
             
     plt.tight_layout()
     plt.show()
