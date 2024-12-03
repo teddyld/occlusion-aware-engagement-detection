@@ -1,6 +1,6 @@
 # <div align="center">Occlusion-aware Engagement Detection Framework</div>
 
-An occlusion-aware framework which implements occlusion-simulating data augmentation methods and an occlusion recovery phase to improve facial expression and engagement recognition compared to non-occlusion-aware models.
+An occlusion-aware framework which implements occlusion-simulating data augmentation methods and occlusion reconstruction to improve facial expression and engagement detection compared to non-occlusion-aware models.
 
 ## Table of Content
 
