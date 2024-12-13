@@ -84,8 +84,6 @@ Download model weights in [GitHub releases](https://github.com/teddyld/occlusion
 
 ## <a id="contacts">Contacts</a>
 
-Email: vincent.pham2@outlook.com
-
 Linkedin: https://www.linkedin.com/in/vincentpham2/
 
 ## <a id="license">Licsense</a>
